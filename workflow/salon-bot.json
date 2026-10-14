@@ -1,0 +1,713 @@
+{
+  "name": "Salon Bot",
+  "nodes": [
+    {
+      "parameters": {
+        "public": "={{ true }}",
+        "initialMessages": "Hi! Welcome to FAST-NUCES Salon. How can I help you today?",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        80,
+        0
+      ],
+      "id": "bd595f5e-fae1-49b2-a6e6-94c675fb921b",
+      "name": "When chat message received",
+      "webhookId": "REPLACE_ME"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "=You are the friendly and professional virtual assistant for the FAST-NUCES Salon.\n\n[PERSONA & STYLE]\n- Language: Reply in the exact same language the customer writes in (English or Roman Urdu).\n- Style: Keep replies short, clear, professional, and polite. Avoid long paragraphs.\n- Scope: Only assist with salon services, prices, timings, appointment booking, cancellations, and rescheduling.\n- Out of Scope: If the customer asks about unrelated topics, politely steer them back to salon services.\n\n[KNOWLEDGE & DATA RULES]\n- NEVER invent or guess prices, services, or timings. \n- ALWAYS use the Google Sheets tools to check the latest salon data before answering.\n- Treat spelling variations or common synonyms as the same service (e.g., \"hair cut\" = \"haircut\", \"shave\" = \"beard trim\").\n- If a requested service is not in the sheet, inform the customer politely.\n- If you do not know the answer or a tool fails, say: \"Our staff will get back to you about this.\"\n\n[PRICE & NEGOTIATION RULES]\n- All prices are fixed and come ONLY from the salon data sheet.\n- Never offer discounts or deals. If asked, say: \"Our prices are fixed. I can help you book at the listed price.\"\n\n[TIME & CONTEXT]\n- Today's Date: {{ $now.format('cccc, yyyy-MM-dd') }}\n- Current Time: {{ $now.format('h:mm a') }}\n- Never offer slots that are in the past.\n\n[[STEP-BY-STEP BOOKING FLOW]\nFollow this exact sequence for bookings. IMPORTANT: Check the conversation history first. SKIP steps if details are already provided. ONLY ask one missing detail at a time.\n\n1. Name & Phone: Ask for name and valid phone number.\n2. Service(s): Ask which service(s) they want. Validate against the sheet. \n   - CRITICAL RULE: A customer can book a MAXIMUM of 3 services (3 slots) at a time. NEVER book \"all\" slots. Never book a slot without assigning a specific service to it.\n   - Count how many services they want (e.g., 2 services = 2 slots).\n3. Slot Selection: \n   - Use 'Get Available Slots' tool. \n   - If they want MULTIPLE services, offer CONSECUTIVE slots by default (e.g., 8:00 PM to 9:00 PM for 2 services). \n   - If consecutive slots are not available, OR if the customer explicitly asks to split their services at different times (e.g., one service at 2:00 PM and another at 8:00 PM), allow them to pick separate slots for each service.\n   - ALWAYS state day, date, and time in 12-hour format with AM/PM (e.g., \"Monday, 2026-10-12 at 8:00 PM\"). NEVER use 24-hour format (\"20:00\").\n   - Show a max of 4-6 available time blocks/options.\n4. Confirmation: Summarize the full booking (Name, Phone, Exact Services, Date, and Time(s)). Ask: \"Shall I confirm this booking?\"\n5. Execution (ONLY AFTER \"YES\"):\n   - For EACH slot/service, run the 'Save Booking' tool to save in Sheet1 (Date in YYYY-MM-DD, Time exactly with AM/PM).\n   - Immediately run the 'Mark Slot Booked' tool for ALL associated SlotIDs in the salon_slots sheet.\n6. Final Message: If tools succeed, confirm booking. If any fail, apologize and offer new slots.\n\n[STEP-BY-STEP CANCELLATION FLOW]\n1. Identify & Retrieve: Ask for their phone number and find their existing booking in the sheet.\n2. Verify: Show their current booking details and ask: \"Are you sure you want to cancel?\"\n3. Execute (ONLY AFTER \"YES\"):\n   - Use your tool to cancel/remove their row from the Bookings sheet.\n   - Use your tool to change their SlotID(s) status to \"Available\" in the salon_slots sheet.\n4. Confirm: \"Your booking has been successfully canceled.\"\n\n[STEP-BY-STEP RESCHEDULING FLOW]\nWhen a customer wants to reschedule (change their booking time/date), you MUST treat it as a strict 2-phase process. Do not skip any phase.\n\n1. Phase 1: Retrieve & Find New Slot\n   - Ask for their phone number (if not provided).\n   - Find their EXISTING booking details using the tool.\n   - Ask for their new preferred day/time. Use the 'Get Available Slots' tool to show new options (12-hour format, AM/PM).\n   - Once they pick a new slot, ask: \"Shall I move your booking to [New Date] at [New Time]?\"\n\n2. Phase 2: Execution (ONLY AFTER \"YES\")\n   CRITICAL INSTRUCTION: You MUST execute the cancellation tools FIRST, before saving the new booking.\n   - Step A (Cancel Old): Run the tool to delete/cancel their OLD booking row from the Bookings sheet.\n   - Step B (Free Old Slot): Run the tool to update their OLD SlotID(s) to 'Available' in the salon_slots sheet.\n   - Step C (Save New): Run the tool to save the NEW booking details in the Bookings sheet.\n   - Step D (Book New Slot): Run the tool to update the NEW SlotID(s) to 'Booked' in the salon_slots sheet.\n\n3. Confirm: Tell the customer: \"Your booking has been successfully rescheduled to [New Date] at [New Time].\" If any of the 4 steps fail, inform them of a system error and ask them to contact staff."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "52b862de-be5f-4a9f-bbb2-30a0a88ae236",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        112,
+        208
+      ],
+      "id": "3a6be6f9-9e6b-45fe-9658-fa83073b7356",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "contextWindowLength": 20
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        288,
+        208
+      ],
+      "id": "aee22c8e-ee6d-4ef8-ae75-3c803c10cf22",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_ME",
+          "mode": "list",
+          "cachedResultName": "Bookings",
+          "cachedResultUrl": " "
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": " "
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Customer Name": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Customer_Name', ``, 'string') }}",
+            "Phone": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Phone', ``, 'string') }}",
+            "Service": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Service', ``, 'string') }}",
+            "Date": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Date', ``, 'string') }}",
+            "Time": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Time', ``, 'string') }}",
+            "Status": "=Pending"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Customer Name",
+              "displayName": "Customer Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Service",
+              "displayName": "Service",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Time",
+              "displayName": "Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        864,
+        304
+      ],
+      "id": "13a9e0f1-ab59-4246-98d3-f0cb863cd1f5",
+      "name": "Save Booking",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_ME",
+          "mode": "list",
+          "cachedResultName": "salon data",
+          "cachedResultUrl": " "
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": " "
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        496,
+        560
+      ],
+      "id": "cfadb999-2c83-41c0-afe3-95d85e26a249",
+      "name": "Salon data",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_ME",
+          "mode": "list",
+          "cachedResultName": "Bookings",
+          "cachedResultUrl": " "
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2074993769,
+          "mode": "list",
+          "cachedResultName": "salon_slots",
+          "cachedResultUrl": " "
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Status",
+              "lookupValue": "Available"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        768,
+        448
+      ],
+      "id": "74d315b4-853f-421a-9066-b601469d5fed",
+      "name": "Get Available Slots",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_ME",
+          "mode": "list",
+          "cachedResultName": "Bookings",
+          "cachedResultUrl": " "
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2074993769,
+          "mode": "list",
+          "cachedResultName": "salon_slots",
+          "cachedResultUrl": " "
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "SlotID": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('SlotID__using_to_match_', ``, 'string') }}",
+            "Status": "Booked"
+          },
+          "matchingColumns": [
+            "SlotID"
+          ],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Day",
+              "displayName": "Day",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Time",
+              "displayName": "Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "SlotID",
+              "displayName": "SlotID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        640,
+        512
+      ],
+      "id": "659bd694-25f2-47ba-a482-e55155fe42e0",
+      "name": "Mark Slot Booked",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Use this tool to CANCEL a customer's booking. Search the row using the customer's Phone Number, and update the 'Status' column to 'Canceled'.",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_ME",
+          "mode": "list",
+          "cachedResultName": "Bookings",
+          "cachedResultUrl": " "
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": " "
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Status', ``, 'string') }}",
+            "Time": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Time', ``, 'string') }}",
+            "Date": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Date', ``, 'string') }}",
+            "Service": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Service', ``, 'string') }}",
+            "Customer Name": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Customer_Name', ``, 'string') }}",
+            "Phone": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Phone__using_to_match_', ``, 'string') }}"
+          },
+          "matchingColumns": [
+            "Phone"
+          ],
+          "schema": [
+            {
+              "id": "Customer Name",
+              "displayName": "Customer Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Service",
+              "displayName": "Service",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Time",
+              "displayName": "Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        928,
+        128
+      ],
+      "id": "c5b937ad-9407-4e4d-a906-23953a4f0ccf",
+      "name": "Cancel in Sheet1 (Bookings)",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Use this tool to free up a time slot after a booking is canceled. Find the row using the SlotID and update the 'Status' column to 'Available'.",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_ME",
+          "mode": "list",
+          "cachedResultName": "Bookings",
+          "cachedResultUrl": " "
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2074993769,
+          "mode": "list",
+          "cachedResultName": "salon_slots",
+          "cachedResultUrl": " "
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "SlotID": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('SlotID__using_to_match_', ``, 'string') }}",
+            "Date": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Date', ``, 'string') }}",
+            "Day": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Day', ``, 'string') }}",
+            "Time": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Time', ``, 'string') }}",
+            "Status": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Status', ``, 'string') }}"
+          },
+          "matchingColumns": [
+            "SlotID"
+          ],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Day",
+              "displayName": "Day",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Time",
+              "displayName": "Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "SlotID",
+              "displayName": "SlotID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        928,
+        -32
+      ],
+      "id": "b655c460-b847-4481-9618-fd2ef88a942c",
+      "name": "Cancel From slots",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Booking": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salon data": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Available Slots": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Slot Booked": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel in Sheet1 (Bookings)": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel From slots": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "99307a4f-5404-4106-90a4-bef990d66991",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "REPLACE_ME"
+  },
+  "nodeGroups": [],
+  "id": "59aMii2tjIEqeeLM",
+  "tags": []
+}
